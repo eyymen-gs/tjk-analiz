@@ -1,12 +1,12 @@
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
+import re
 import requests
 import pandas as pd
 from datetime import datetime
 import json
 import time
 from bs4 import BeautifulSoup
-
 SEHIRLER = {
     "Istanbul":  1,
     "Izmir":     2,
@@ -197,3 +197,84 @@ if __name__ == "__main__":
     if toplam == 0:
         print("\n⚠️  Veri gelmedi. Terminalde URL'yi kontrol et.")
         print("    TJK sitesine tarayıcıdan erişebildiğini doğrula.")
+        def gunluk_sonuclari_cek(tarih, sehir_id, sehir_adi):
+    """TJK'dan günlük yarış sonuçlarını çek"""
+    tarih_enc = tarih.replace("/", "%2F")
+    url = (
+        f"https://www.tjk.org/TR/YarisSever/Info/Sehir/GunlukYarisSonuclari"
+        f"?SehirId={sehir_id}&QueryParameter_Tarih={tarih_enc}"
+        f"&SehirAdi={sehir_adi}&Era=today"
+    )
+    
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        if r.status_code != 200:
+            return []
+        
+        soup = BeautifulSoup(r.text, "html.parser")
+        sonuclar = []
+        kosu_no  = 0
+        
+        tablolar = soup.find_all("table")
+        
+        for tablo in tablolar:
+            basliklar = tablo.find_all("th")
+            if not basliklar:
+                continue
+            baslik_metinleri = [b.text.strip() for b in basliklar]
+            if "At İsmi" not in baslik_metinleri and "Derece" not in baslik_metinleri:
+                continue
+            
+            kosu_no += 1
+            satirlar = tablo.find_all("tr")[1:]
+            
+            for satir in satirlar:
+                hucreler = satir.find_all("td")
+                if len(hucreler) < 3:
+                    continue
+                try:
+                    at_linki = satir.find("a", href=lambda x: x and "AtKosuBilgileri" in str(x))
+                    at_adi   = at_linki.text.strip() if at_linki else hucreler[1].text.strip()
+                    at_adi   = re.sub(r'\s+', ' ', at_adi).strip()
+                    at_adi   = at_adi.split("(")[0].strip()
+                    
+                    metinler = [h.text.strip() for h in hucreler]
+                    sira     = metinler[0] if metinler else ""
+                    
+                    sonuclar.append({
+                        "kosu_no": kosu_no,
+                        "sira":    sira,
+                        "at_adi":  at_adi,
+                    })
+                except:
+                    continue
+        
+        return sonuclar
+    
+    except Exception as e:
+        print(f"Sonuç çekme hatası: {e}")
+        return []
+
+def tum_sonuclari_cek(tarih=None):
+    """Tüm şehirlerin sonuçlarını çek ve kaydet"""
+    if tarih is None:
+        tarih = bugun_tarih()
+    
+    sehirler = aktif_sehirleri_bul(tarih)
+    tum_sonuclar = {}
+    
+    for sehir in sehirler:
+        print(f"Sonuçlar çekiliyor: {sehir['adi']}...")
+        sonuclar = gunluk_sonuclari_cek(tarih, sehir["id"], sehir["adi"])
+        if sonuclar:
+            tum_sonuclar[sehir["adi"]] = sonuclar
+            print(f"  ✅ {len(sonuclar)} sonuç alındı")
+        time.sleep(2)
+    
+    with open("tjk_sonuclar.json", "w", encoding="utf-8") as f:
+        json.dump(tum_sonuclar, f, ensure_ascii=False, indent=2)
+    
+    print("✅ tjk_sonuclar.json oluşturuldu")
+    return tum_sonuclar
