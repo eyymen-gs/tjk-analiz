@@ -7,7 +7,7 @@ import subprocess
 import asyncio
 from datetime import time
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, JobQueue
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 TOKEN    = os.environ.get("TOKEN") or "8653911412:AAHP9AWee0f60aNy_qNmTRUx_LRq9B05Kcs"
 ADMIN_ID = 6424297442
@@ -82,7 +82,6 @@ def alti_ganyan_mesaj(sehir, atlar, baslangic_kosu=1):
         else:
             return 2
 
-    # Koşuları grupla
     kosu_gruplari = defaultdict(list)
     for at in atlar:
         kosu_gruplari[at["kosu_no"]].append(at)
@@ -145,12 +144,10 @@ def alti_ganyan_mesaj(sehir, atlar, baslangic_kosu=1):
             "etiket":  etiket
         })
 
-    # Kombinasyon sayısını hesapla
     kombin_sayi = 1
     for grup in kombinasyon_atlar:
         kombin_sayi *= len(grup)
 
-    # Maksimum 108 kupona sınırla
     while kombin_sayi > 108 and any(len(g) > 1 for g in kombinasyon_atlar):
         max_idx = max(range(len(kombinasyon_atlar)), key=lambda i: len(kombinasyon_atlar[i]))
         if len(kombinasyon_atlar[max_idx]) > 1:
@@ -161,11 +158,10 @@ def alti_ganyan_mesaj(sehir, atlar, baslangic_kosu=1):
         for grup in kombinasyon_atlar:
             kombin_sayi *= len(grup)
 
-    # Kupon özeti
     mesaj_satirlar.append(f"\n{'='*30}")
     mesaj_satirlar.append(f"🎯 *Kupon Önerisi:*")
     for k in onerilen_kuponlar:
-        atlar_str = " + ".join(k["secilen"])
+        atlar_str  = " + ".join(k["secilen"])
         gercek_kac = len(k["secilen"])
         mesaj_satirlar.append(f"  {k['kosu_no']}. Koşu ({gercek_kac} at): {atlar_str}")
 
@@ -174,8 +170,6 @@ def alti_ganyan_mesaj(sehir, atlar, baslangic_kosu=1):
     mesaj_satirlar.append(f"\n⚠️ _Bu analiz istatistiksel bir modeldir, kesin sonuç garantisi vermez._")
 
     return "\n".join(mesaj_satirlar)
-
-# ─── Telegram Handler'ları ─────────────────────────────────────────────
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -216,13 +210,12 @@ async def guncelle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Veriler güncelleniyor, biraz bekle...")
     basari = analiz_calistir()
 
-  if basari:
+    if basari:
         await update.message.reply_text("✅ Veriler güncellendi! /bugun ile analizi görebilirsin.")
     else:
         await update.message.reply_text("❌ Güncelleme sırasında hata oluştu.")
 
 async def otomatik_guncelle(context):
-    """Her sabah 08:00'de otomatik çalışır"""
     print("⏰ Otomatik güncelleme başladı...")
     basari = analiz_calistir()
     if basari:
@@ -238,7 +231,6 @@ async def otomatik_guncelle(context):
         )
 
 async def sonuc_karsilastir(context):
-    """Her gece 22:00'de tahminleri gerçek sonuçlarla karşılaştır"""
     print("📊 Sonuç karşılaştırması başladı...")
 
     try:
@@ -331,22 +323,20 @@ async def sonuc_karsilastir(context):
         parse_mode="Markdown"
     )
     print("✅ Sonuç karşılaştırması tamamlandı")
-# ─── Botu başlat ──────────────────────────────────────────────────────
 
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start",    start))
 app.add_handler(CommandHandler("bugun",    bugun))
 app.add_handler(CommandHandler("guncelle", guncelle))
 
-# Her sabah 08:00'de otomatik güncelle (Türkiye saati UTC+3)
 job_queue = app.job_queue
 job_queue.run_daily(
     otomatik_guncelle,
-    time=time(hour=5, minute=0, second=0),  # UTC 05:00 = Türkiye 08:00
+    time=time(hour=5, minute=0, second=0),
 )
 job_queue.run_daily(
     sonuc_karsilastir,
-    time=time(hour=19, minute=0, second=0),  # UTC 19:00 = Türkiye 22:00
+    time=time(hour=19, minute=0, second=0),
 )
 
 print("🤖 TJK Bot çalışıyor...")
