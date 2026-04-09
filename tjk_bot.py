@@ -4,8 +4,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 import json
 import os
 import subprocess
+import asyncio
+from datetime import time
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, JobQueue
 
 TOKEN    = os.environ.get("TOKEN") or "8653911412:AAHP9AWee0f60aNy_qNmTRUx_LRq9B05Kcs"
 ADMIN_ID = 6424297442
@@ -218,7 +220,21 @@ async def guncelle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Veriler güncellendi! /bugun ile analizi görebilirsin.")
     else:
         await update.message.reply_text("❌ Güncelleme sırasında hata oluştu.")
-
+async def otomatik_guncelle(context):
+    """Her sabah 08:00'de otomatik çalışır"""
+    print("⏰ Otomatik güncelleme başladı...")
+    basari = analiz_calistir()
+    if basari:
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text="✅ Sabah güncellemesi tamamlandı! /bugun ile analizi görebilirsin."
+        )
+        print("✅ Otomatik güncelleme tamamlandı")
+    else:
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text="❌ Sabah güncellemesi sırasında hata oluştu."
+        )
 # ─── Botu başlat ──────────────────────────────────────────────────────
 
 app = ApplicationBuilder().token(TOKEN).build()
@@ -226,5 +242,13 @@ app.add_handler(CommandHandler("start",    start))
 app.add_handler(CommandHandler("bugun",    bugun))
 app.add_handler(CommandHandler("guncelle", guncelle))
 
+# Her sabah 08:00'de otomatik güncelle (Türkiye saati UTC+3)
+job_queue = app.job_queue
+job_queue.run_daily(
+    otomatik_guncelle,
+    time=time(hour=5, minute=0, second=0),  # UTC 05:00 = Türkiye 08:00
+)
+
 print("🤖 TJK Bot çalışıyor...")
+print("⏰ Otomatik güncelleme: Her sabah 08:00 (Türkiye saati)")
 app.run_polling()
