@@ -82,21 +82,20 @@ def alti_ganyan_mesaj(sehir, atlar, baslangic_kosu=1):
         else:
             return 2
 
+    # Tüm koşuları grupla
     kosu_gruplari = defaultdict(list)
     for at in atlar:
         kosu_gruplari[at["kosu_no"]].append(at)
 
-    kosu_nolari  = sorted(kosu_gruplari.keys())
-    alti_kosular = kosu_nolari[baslangic_kosu-1 : baslangic_kosu+5]
+    kosu_nolari = sorted(kosu_gruplari.keys())
+    toplam_kosu = len(kosu_nolari)
 
-    if len(alti_kosular) < 6:
-        return "❌ 6 koşu bulunamadı."
+    mesaj_satirlar = [f"🏇 *{sehir} — Tüm Koşular Analizi*\n{'='*30}"]
+    mesaj_satirlar.append(f"📌 Toplam {toplam_kosu} koşu\n")
 
-    mesaj_satirlar    = [f"🏇 *{sehir} — Altılı Ganyan Analizi*\n{'='*30}"]
-    kombinasyon_atlar = []
-    onerilen_kuponlar = []
+    tum_kosular_skorlu = {}
 
-    for kosu_no in alti_kosular:
+    for kosu_no in kosu_nolari:
         kosu_atlari = kosu_gruplari[kosu_no]
 
         skorlu = []
@@ -120,54 +119,71 @@ def alti_ganyan_mesaj(sehir, atlar, baslangic_kosu=1):
 
         mesaj_satirlar.append(f"\n*{kosu_no}. Koşu* — {etiket}")
 
-        onerilen = []
         for i, at in enumerate(skorlu[:4]):
-            secildi   = i < kac_at
             isaretler = "⭐" if i == 0 else ("✅" if i == 1 else ("🔵" if i == 2 else "▪️"))
-            kupon_isa = "◀️" if secildi else "  "
             son6_str  = "".join(str(d) for d in at.get("son6", []))
             mesaj_satirlar.append(
-                f"{kupon_isa}{isaretler} {at['at_adi']} "
+                f"{isaretler} {at['at_adi']} "
                 f"| %{at['ihtimal']} "
                 f"| Gny:{at['gny']} "
                 f"| AGF:{at.get('agf_yuzde') or 0:.0f}% "
                 f"| Form:{son6_str}"
             )
-            if secildi:
-                onerilen.append(at['at_adi'])
 
-        kombinasyon_atlar.append(onerilen)
-        onerilen_kuponlar.append({
-            "kosu_no": kosu_no,
-            "secilen": onerilen,
-            "kac_at":  kac_at,
-            "etiket":  etiket
-        })
+        tum_kosular_skorlu[kosu_no] = {
+            "skorlu": skorlu,
+            "kac_at": kac_at
+        }
 
-    kombin_sayi = 1
-    for grup in kombinasyon_atlar:
-        kombin_sayi *= len(grup)
+    # Altılı grupları için kupon önerisi
+    mesaj_satirlar.append(f"\n{'='*30}")
+    mesaj_satirlar.append(f"🎯 *Altılı Grup Önerileri:*\n")
 
-    while kombin_sayi > 108 and any(len(g) > 1 for g in kombinasyon_atlar):
-        max_idx = max(range(len(kombinasyon_atlar)), key=lambda i: len(kombinasyon_atlar[i]))
-        if len(kombinasyon_atlar[max_idx]) > 1:
-            kombinasyon_atlar[max_idx].pop()
-            onerilen_kuponlar[max_idx]["secilen"].pop()
-            onerilen_kuponlar[max_idx]["kac_at"] -= 1
+    for baslangic in range(1, toplam_kosu - 4):
+        grup_kosular = kosu_nolari[baslangic-1 : baslangic+5]
+        if len(grup_kosular) < 6:
+            break
+
+        kombinasyon_atlar = []
+        onerilen_kuponlar = []
+
+        for kosu_no in grup_kosular:
+            veri = tum_kosular_skorlu[kosu_no]
+            skorlu = veri["skorlu"]
+            kac_at = veri["kac_at"]
+            onerilen = [at["at_adi"] for at in skorlu[:kac_at]]
+            kombinasyon_atlar.append(onerilen)
+            onerilen_kuponlar.append({
+                "kosu_no": kosu_no,
+                "secilen": onerilen,
+                "kac_at":  kac_at
+            })
+
         kombin_sayi = 1
         for grup in kombinasyon_atlar:
             kombin_sayi *= len(grup)
 
-    mesaj_satirlar.append(f"\n{'='*30}")
-    mesaj_satirlar.append(f"🎯 *Kupon Önerisi:*")
-    for k in onerilen_kuponlar:
-        atlar_str  = " + ".join(k["secilen"])
-        gercek_kac = len(k["secilen"])
-        mesaj_satirlar.append(f"  {k['kosu_no']}. Koşu ({gercek_kac} at): {atlar_str}")
+        while kombin_sayi > 108 and any(len(g) > 1 for g in kombinasyon_atlar):
+            max_idx = max(range(len(kombinasyon_atlar)), key=lambda i: len(kombinasyon_atlar[i]))
+            if len(kombinasyon_atlar[max_idx]) > 1:
+                kombinasyon_atlar[max_idx].pop()
+                onerilen_kuponlar[max_idx]["secilen"].pop()
+                onerilen_kuponlar[max_idx]["kac_at"] -= 1
+            kombin_sayi = 1
+            for grup in kombinasyon_atlar:
+                kombin_sayi *= len(grup)
 
-    mesaj_satirlar.append(f"\n💡 *Toplam:* {kombin_sayi} kupon")
-    mesaj_satirlar.append(f"💰 *Min. yatırım:* {kombin_sayi * 3} TL")
-    mesaj_satirlar.append(f"\n⚠️ _Bu analiz istatistiksel bir modeldir, kesin sonuç garantisi vermez._")
+        mesaj_satirlar.append(
+            f"*{grup_kosular[0]}-{grup_kosular[5]}. koşular "
+            f"({kombin_sayi} kupon / {kombin_sayi*3} TL):*"
+        )
+        for k in onerilen_kuponlar:
+            atlar_str  = " + ".join(k["secilen"])
+            gercek_kac = len(k["secilen"])
+            mesaj_satirlar.append(f"  {k['kosu_no']}. Koşu ({gercek_kac} at): {atlar_str}")
+        mesaj_satirlar.append("")
+
+    mesaj_satirlar.append(f"⚠️ _Bu analiz istatistiksel bir modeldir, kesin sonuç garantisi vermez._")
 
     return "\n".join(mesaj_satirlar)
 
