@@ -216,10 +216,11 @@ async def guncelle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Veriler güncelleniyor, biraz bekle...")
     basari = analiz_calistir()
 
-    if basari:
+  if basari:
         await update.message.reply_text("✅ Veriler güncellendi! /bugun ile analizi görebilirsin.")
     else:
         await update.message.reply_text("❌ Güncelleme sırasında hata oluştu.")
+
 async def otomatik_guncelle(context):
     """Her sabah 08:00'de otomatik çalışır"""
     print("⏰ Otomatik güncelleme başladı...")
@@ -235,6 +236,101 @@ async def otomatik_guncelle(context):
             chat_id=ADMIN_ID,
             text="❌ Sabah güncellemesi sırasında hata oluştu."
         )
+
+async def sonuc_karsilastir(context):
+    """Her gece 22:00'de tahminleri gerçek sonuçlarla karşılaştır"""
+    print("📊 Sonuç karşılaştırması başladı...")
+
+    try:
+        subprocess.run(
+            ["python", "-c", "from tjk_veri import tum_sonuclari_cek; tum_sonuclari_cek()"],
+            check=True, capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+    except Exception as e:
+        print(f"Sonuç çekme hatası: {e}")
+        return
+
+    try:
+        with open("tjk_temiz.json", "r", encoding="utf-8") as f:
+            tahminler = json.load(f)
+        with open("tjk_sonuclar.json", "r", encoding="utf-8") as f:
+            sonuclar = json.load(f)
+    except Exception as e:
+        print(f"Dosya okuma hatası: {e}")
+        return
+
+    from collections import defaultdict
+
+    mesaj_satirlar = ["📊 *Bugünkü Tahmin Sonuçları*\n"]
+
+    for sehir in tahminler:
+        if sehir not in sonuclar:
+            continue
+
+        mesaj_satirlar.append(f"\n🏇 *{sehir}*")
+
+        tahmin_gruplari = defaultdict(list)
+        for at in tahminler[sehir]:
+            tahmin_gruplari[at["kosu_no"]].append(at)
+
+        sonuc_gruplari = defaultdict(list)
+        for s in sonuclar[sehir]:
+            sonuc_gruplari[s["kosu_no"]].append(s)
+
+        toplam_kosu = 0
+        dogru_kosu  = 0
+
+        for kosu_no in sorted(tahmin_gruplari.keys()):
+            tahmin_atlari  = tahmin_gruplari[kosu_no]
+            kosu_sonuclari = sonuc_gruplari.get(kosu_no, [])
+
+            if not kosu_sonuclari:
+                continue
+
+            birinci = None
+            for s in kosu_sonuclari:
+                if s["sira"] == "1":
+                    birinci = s["at_adi"]
+                    break
+
+            if not birinci:
+                continue
+
+            tahmin_isimleri = [at["at_adi"] for at in sorted(
+                tahmin_atlari, key=lambda x: x.get("agf_yuzde") or 0, reverse=True
+            )[:2]]
+
+            toplam_kosu += 1
+            tuttu = any(
+                birinci.upper() in t.upper() or t.upper() in birinci.upper()
+                for t in tahmin_isimleri
+            )
+
+            if tuttu:
+                dogru_kosu += 1
+                isaretler = "✅"
+            else:
+                isaretler = "❌"
+
+            tahmin_str = " / ".join(tahmin_isimleri)
+            mesaj_satirlar.append(
+                f"  {isaretler} {kosu_no}. Koşu: Kazanan: *{birinci}* | Tahmin: {tahmin_str}"
+            )
+
+        if toplam_kosu > 0:
+            mesaj_satirlar.append(f"  📈 Sonuç: {dogru_kosu}/{toplam_kosu} doğru")
+
+    mesaj = "\n".join(mesaj_satirlar)
+    if len(mesaj) > 4096:
+        mesaj = mesaj[:4090] + "..."
+
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=mesaj,
+        parse_mode="Markdown"
+    )
+    print("✅ Sonuç karşılaştırması tamamlandı")
 # ─── Botu başlat ──────────────────────────────────────────────────────
 
 app = ApplicationBuilder().token(TOKEN).build()
@@ -247,6 +343,10 @@ job_queue = app.job_queue
 job_queue.run_daily(
     otomatik_guncelle,
     time=time(hour=5, minute=0, second=0),  # UTC 05:00 = Türkiye 08:00
+)
+job_queue.run_daily(
+    sonuc_karsilastir,
+    time=time(hour=19, minute=0, second=0),  # UTC 19:00 = Türkiye 22:00
 )
 
 print("🤖 TJK Bot çalışıyor...")
