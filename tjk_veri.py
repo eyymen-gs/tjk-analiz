@@ -197,7 +197,8 @@ if __name__ == "__main__":
     if toplam == 0:
         print("\n⚠️  Veri gelmedi. Terminalde URL'yi kontrol et.")
         print("    TJK sitesine tarayıcıdan erişebildiğini doğrula.")
-        def gunluk_sonuclari_cek(tarih, sehir_id, sehir_adi):
+
+def gunluk_sonuclari_cek(tarih, sehir_id, sehir_adi):
     """TJK'dan günlük yarış sonuçlarını çek"""
     tarih_enc = tarih.replace("/", "%2F")
     url = (
