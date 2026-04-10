@@ -222,19 +222,35 @@ async def guncelle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if kullanici_id != ADMIN_ID:
         await update.message.reply_text("⛔ Sadece admin kullanabilir.")
         return
-
     await update.message.reply_text("⏳ Veriler güncelleniyor, biraz bekle...")
     basari = analiz_calistir()
-
     if basari:
         await update.message.reply_text("✅ Veriler güncellendi! /bugun ile analizi görebilirsin.")
     else:
         await update.message.reply_text("❌ Güncelleme sırasında hata oluştu.")
 
+async def debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    kullanici_id = update.message.from_user.id
+    if kullanici_id != ADMIN_ID:
+        return
+    
+    try:
+        with open("tjk_sonuclar.json", "r", encoding="utf-8") as f:
+            sonuclar = json.load(f)
+        mesaj = f"Şehirler: {list(sonuclar.keys())}\n"
+        for sehir, veri in sonuclar.items():
+            mesaj += f"{sehir}: {len(veri)} sonuç\n"
+            if veri:
+                mesaj += f"İlk kayıt: {veri[0]}\n"
+    except Exception as e:
+        mesaj = f"Hata: {e}"
+    
+    await update.message.reply_text(mesaj[:4096])
+
 async def otomatik_guncelle(context):
     print("⏰ Otomatik güncelleme başladı...")
-    basari = analiz_calistir()
-    if basari:
+    basari = analiz_calistir()    
+        if basari:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text="✅ Sabah güncellemesi tamamlandı! /bugun ile analizi görebilirsin."
@@ -344,6 +360,7 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start",    start))
 app.add_handler(CommandHandler("bugun",    bugun))
 app.add_handler(CommandHandler("guncelle", guncelle))
+app.add_handler(CommandHandler("debug", debug))
 
 job_queue = app.job_queue
 job_queue.run_daily(
