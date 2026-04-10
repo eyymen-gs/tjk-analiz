@@ -246,7 +246,22 @@ async def debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mesaj = f"Hata: {e}"
     
     await update.message.reply_text(mesaj[:4096])
-
+async def sonuccek(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    kullanici_id = update.message.from_user.id
+    if kullanici_id != ADMIN_ID:
+        return
+    
+    await update.message.reply_text("⏳ Sonuçlar çekiliyor...")
+    
+    try:
+        subprocess.run(
+            ["python", "-c", "from tjk_veri import tum_sonuclari_cek; tum_sonuclari_cek()"],
+            check=True, capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        await update.message.reply_text("✅ Sonuçlar çekildi! /debug ile kontrol et.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Hata: {e}")
 async def otomatik_guncelle(context):
     print("⏰ Otomatik güncelleme başladı...")
     basari = analiz_calistir()    
@@ -361,6 +376,7 @@ app.add_handler(CommandHandler("start",    start))
 app.add_handler(CommandHandler("bugun",    bugun))
 app.add_handler(CommandHandler("guncelle", guncelle))
 app.add_handler(CommandHandler("debug", debug))
+app.add_handler(CommandHandler("sonuccek", sonuccek))
 
 job_queue = app.job_queue
 job_queue.run_daily(
