@@ -250,7 +250,7 @@ async def debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def otomatik_guncelle(context):
     print("⏰ Otomatik güncelleme başladı...")
     basari = analiz_calistir()    
-        if basari:
+    if basari:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text="✅ Sabah güncellemesi tamamlandı! /bugun ile analizi görebilirsin."
