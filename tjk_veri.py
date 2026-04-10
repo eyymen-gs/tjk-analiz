@@ -54,6 +54,10 @@ def sehir_program_cek(sehir_adi, sehir_id, tarih):
         print(f"  Bulunan koşu sayısı: {len(kosu_basliklar)}")
         
         tablolar = soup.find_all("table")
+        print(f"Sonuç sayfası tablo sayısı: {len(tablolar)}")
+        for i, t in enumerate(tablolar[:3]):
+            basliklar = [b.text.strip() for b in t.find_all("th")]
+            print(f"Tablo {i}: {basliklar[:5]}")
         print(f"  Bulunan tablo sayısı: {len(tablolar)}")
         
         for tablo in tablolar:
